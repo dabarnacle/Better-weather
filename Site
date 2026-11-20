@@ -1,0 +1,221 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LA Weather" />
+  <title>LA Microclimate Forecast</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --rain: #60a5fa;
+      --sun: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: env(safe-area-inset-top, 16px) 14px 32px; max-width: 600px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    .badge { font-size: 0.7rem; background: #0284c733; color: var(--accent); border: 1px solid #0284c766; padding: 3px 8px; border-radius: 999px; }
+    .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .tab { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 10px 6px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: center; transition: 0.15s; }
+    .tab.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
+    .sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 12px; display: flex; justify-content: space-between; }
+    .day-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+    .day-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; }
+    .day-name { font-weight: 700; font-size: 1rem; }
+    .temps { font-size: 1.05rem; font-weight: 700; }
+    .temps span { color: var(--muted); font-weight: 500; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; font-size: 0.82rem; }
+    .item { display: flex; flex-direction: column; }
+    .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .val { font-weight: 600; margin-top: 1px; }
+    .rain-val { color: var(--rain); }
+    .sun-val { color: var(--sun); }
+    .loading { text-align: center; padding: 40px 0; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LA 7-Day Forecast</h1>
+    <span class="badge" id="source-badge">Loading...</span>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="sub">
+    <span id="loc-desc"></span>
+    <span id="updated-time"></span>
+  </div>
+  <div id="forecast-list"><div class="loading">Fetching NWS & Open-Meteo data...</div></div>
+
+  <script>
+    const LOCATIONS = [
+      { id: 'coast', name: 'Coast', desc: 'Santa Monica / Venice / South Bay', lat: 34.0195, lon: -118.4912 },
+      { id: 'basin', name: 'LA Basin', desc: 'DTLA / Culver City / Mid-City', lat: 34.0259, lon: -118.3965 },
+      { id: 'valley', name: 'Valleys', desc: 'Pasadena / SGV / SFV', lat: 34.1478, lon: -118.1445 }
+    ];
+
+    let activeLoc = LOCATIONS[0];
+    const cache = {};
+
+    function degToCompass(deg) {
+      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      return dirs[Math.round(deg / 22.5) % 16];
+    }
+
+    function classifyCloud(low, mid, high, total) {
+      if (total < 15) return `Clear (${total}%)`;
+      if (low >= mid && low >= high) {
+        return total > 75 ? `Overcast Stratus (${total}%)` : `Marine Stratus/Cu (${total}%)`;
+      }
+      if (mid >= low && mid >= high) return `Altocumulus (${total}%)`;
+      return `High Cirrus (${total}%)`;
+    }
+
+    function sunLabel(uv, mj) {
+      let level = 'Low';
+      if (uv >= 8) level = 'Very High';
+      else if (uv >= 6) level = 'High';
+      else if (uv >= 3) level = 'Moderate';
+      return `UV ${uv.toFixed(1)} (${level}) · ${mj.toFixed(1)} MJ/m²`;
+    }
+
+    async function fetchNWS(lat, lon) {
+      try {
+        const ptRes = await fetch(`https://weather.gov{lat},${lon}`, {
+          headers: { 'User-Agent': 'PersonalLAWeatherApp/1.0' }
+        });
+        if (!ptRes.ok) return null;
+        const ptData = await ptRes.json();
+        const fcRes = await fetch(ptData.properties.forecast, {
+          headers: { 'User-Agent': 'PersonalLAWeatherApp/1.0' }
+        });
+        if (!fcRes.ok) return null;
+        const fcData = await fcRes.json();
+        const periods = fcData.properties.periods;
+        const byDate = {};
+
+        periods.forEach(p => {
+          const dateKey = p.startTime.slice(0, 10);
+          if (!byDate[dateKey]) byDate[dateKey] = {};
+          const pop = p.probabilityOfPrecipitation?.value ?? 0;
+          if (p.isDaytime) {
+            byDate[dateKey].high = p.temperature;
+            byDate[dateKey].dayPop = pop;
+          } else {
+            byDate[dateKey].low = p.temperature;
+            byDate[dateKey].nightPop = pop;
+          }
+        });
+        return byDate;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function loadForecast(loc) {
+      const listEl = document.getElementById('forecast-list');
+      const badgeEl = document.getElementById('source-badge');
+      document.getElementById('loc-desc').textContent = loc.desc;
+
+      if (cache[loc.id]) {
+        render(cache[loc.id]);
+        return;
+      }
+
+      listEl.innerHTML = '<div class="loading">Averaging NWS & Open-Meteo models...</div>';
+
+      const omUrl = `https://open-meteo.com{loc.lat}&longitude=${loc.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles`;
+
+      const [omRes, nwsData] = await Promise.all([
+        fetch(omUrl).then(r => r.json()),
+        fetchNWS(loc.lat, loc.lon)
+      ]);
+
+      const days = omRes.daily.time.map((dateStr, i) => {
+        // Slice daytime hours (08:00 to 18:00) for accurate cloud type & humidity
+        const startIdx = i * 24 + 8;
+        const endIdx = i * 24 + 19;
+        const avg = arr => Math.round(arr.slice(startIdx, endIdx).reduce((a, b) => a + b, 0) / 11);
+
+        const cTotal = avg(omRes.hourly.cloud_cover);
+        const cLow = avg(omRes.hourly.cloud_cover_low);
+        const cMid = avg(omRes.hourly.cloud_cover_mid);
+        const cHigh = avg(omRes.hourly.cloud_cover_high);
+        const hum = avg(omRes.hourly.relative_humidity_2m);
+
+        let high = omRes.daily.temperature_2m_max[i];
+        let low = omRes.daily.temperature_2m_min[i];
+        let pop = omRes.daily.precipitation_probability_max[i];
+
+        // Blend with NWS if available
+        const nwsDay = nwsData?.[dateStr];
+        if (nwsDay) {
+          if (nwsDay.high != null) high = (high + nwsDay.high) / 2;
+          if (nwsDay.low != null) low = (low + nwsDay.low) / 2;
+          const nwsPop = Math.max(nwsDay.dayPop ?? 0, nwsDay.nightPop ?? 0);
+          pop = Math.round((pop + nwsPop) / 2);
+        }
+
+        const dateObj = new Date(dateStr + 'T12:00:00');
+        const label = i === 0 ? 'Today' : dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+        return {
+          label,
+          high: Math.round(high),
+          low: Math.round(low),
+          pop,
+          precipIn: omRes.daily.precipitation_sum[i].toFixed(2),
+          cloudText: classifyCloud(cLow, cMid, cHigh, cTotal),
+          humidity: hum,
+          wind: `${degToCompass(omRes.daily.wind_direction_10m_dominant[i])} ${Math.round(omRes.daily.wind_speed_10m_max[i])} mph`,
+          sun: sunLabel(omRes.daily.uv_index_max[i], omRes.daily.shortwave_radiation_sum[i])
+        };
+      });
+
+      const payload = { days, blended: !!nwsData, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      cache[loc.id] = payload;
+      render(payload);
+    }
+
+    function render(data) {
+      document.getElementById('source-badge').textContent = data.blended ? 'NWS + Open-Meteo Avg' : 'Open-Meteo';
+      document.getElementById('updated-time').textContent = `Updated ${data.time}`;
+
+      document.getElementById('forecast-list').innerHTML = data.days.map(d => `
+        <div class="day-card">
+          <div class="day-top">
+            <span class="day-name">${d.label}</span>
+            <span class="temps">${d.high}° <span>/ ${d.low}°</span></span>
+          </div>
+          <div class="grid">
+            <div class="item">
+              <span class="label">Precipitation</span>
+              <span class="val rain-val">${d.pop}% · ${d.precipIn}"</span>
+            </div>
+            <div class="item">
+              <span class="label">Clouds</span>
+              <span class="val">${d.cloudText}</span>
+            </div>
+            <div class="item">
+              <span class="label">Wind (Peak)</span>
+              <span class="val">${d.wind}</span>
+            </div>
+            <div class="item">
+              <span class="label">Humidity (Day)</span>
+              <span class="val">${d.humidity}%</span>
+            </div>
+            <div class="item" style="grid-column: span 2;">
+              <span class="label">Sun Intensity</span>
+              <span class="val sun-val">${d.sun}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
