@@ -4,7 +4,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LA Weather</title>
+<meta name="theme-color" content="#0f172a">
+<title>LA 7-Day Weather</title>
 
 <style>
 * {
@@ -20,42 +21,47 @@ body {
   padding: 20px 14px 40px;
   max-width: 600px;
   margin: 0 auto;
+  min-height: 100vh;
 }
 
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
-h1 { font-size: 1.2rem; }
+h1 {
+  font-size: 1.2rem;
+}
 
 .badge {
   font-size: 0.72rem;
   background: #0284c733;
   color: #38bdf8;
   border: 1px solid #0284c766;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 99px;
+  white-space: nowrap;
 }
 
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .tab {
   background: #1e293b;
   border: 1px solid #334155;
   color: #94a3b8;
-  padding: 10px 4px;
-  border-radius: 10px;
+  padding: 12px 4px;
+  border-radius: 11px;
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
+  -webkit-appearance: none;
 }
 
 .tab.active {
@@ -67,57 +73,91 @@ h1 { font-size: 1.2rem; }
 .sub {
   font-size: 0.75rem;
   color: #94a3b8;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
+}
+
+#desc {
+  line-height: 1.5;
 }
 
 .card {
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 10px;
+  padding: 15px;
+  margin-bottom: 11px;
 }
 
 .top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   border-bottom: 1px solid #334155;
-  padding-bottom: 8px;
-  margin-bottom: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
   font-weight: 700;
+  font-size: 0.95rem;
 }
 
-.top span { color: #94a3b8; font-weight: 500; }
+.top span {
+  color: #94a3b8;
+  font-weight: 500;
+}
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
+  gap: 13px 12px;
   font-size: 0.82rem;
 }
 
 .lbl {
   color: #94a3b8;
-  font-size: 0.68rem;
+  font-size: 0.67rem;
   text-transform: uppercase;
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
 }
 
-.val { font-weight: 600; }
+.val {
+  font-weight: 600;
+  line-height: 1.5;
+}
 
 .msg {
-  padding: 20px 10px;
+  padding: 25px 12px;
   color: #94a3b8;
-  line-height: 1.5;
+  line-height: 1.6;
   font-size: 0.85rem;
   overflow-wrap: anywhere;
 }
 
-.error { color: #fca5a5; }
+.error {
+  color: #fca5a5;
+}
+
+.retry {
+  margin-top: 16px;
+  padding: 11px 20px;
+  border: none;
+  border-radius: 9px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.footer {
+  color: #64748b;
+  text-align: center;
+  font-size: 0.7rem;
+  margin-top: 20px;
+}
 
 </style>
 </head>
@@ -126,21 +166,29 @@ h1 { font-size: 1.2rem; }
 
 <header>
   <h1>LA 7-Day Forecast</h1>
-  <span class="badge" id="badge">Loading...</span>
+  <span class="badge" id="badge">Starting...</span>
 </header>
 
 <div class="tabs" id="tabs"></div>
 
 <div class="sub">
-  <span id="desc"></span>
+  <span id="desc">Loading location...</span>
   <span id="time"></span>
 </div>
 
 <div id="list">
-  <div class="msg">Loading weather...</div>
+  <div class="msg">Loading weather forecast...</div>
+</div>
+
+<div class="footer">
+  Weather data provided by Open-Meteo
 </div>
 
 <script>
+
+// =====================================
+// LOCATIONS
+// =====================================
 
 const LOCS = [
   {
@@ -167,133 +215,139 @@ const LOCS = [
 ];
 
 let active = LOCS[0];
+
 const cache = {};
 
 const dirs = [
-  "N","NNE","NE","ENE","E","ESE","SE","SSE",
-  "S","SSW","SW","WSW","W","WNW","NW","NNW"
+  "N","NNE","NE","ENE",
+  "E","ESE","SE","SSE",
+  "S","SSW","SW","WSW",
+  "W","WNW","NW","NNW"
 ];
 
+// =====================================
+// HELPERS
+// =====================================
+
 function compass(deg) {
-  return dirs[Math.round((deg || 0) / 22.5) % 16];
+  if (deg == null) return "N";
+
+  return dirs[
+    Math.round(deg / 22.5) % 16
+  ];
 }
 
 function average(arr, start, end) {
-  const values = arr.slice(start, end).filter(
-    v => v !== null && v !== undefined
-  );
+  const values = arr
+    .slice(start, end)
+    .filter(v => v != null);
 
   if (!values.length) return 0;
 
   return Math.round(
-    values.reduce((a, b) => a + b, 0) / values.length
+    values.reduce((a, b) => a + b, 0) /
+    values.length
   );
 }
 
 function cloudText(low, mid, high, total) {
-  if (total < 15) return `Clear (${total}%)`;
 
-  if (low >= mid && low >= high)
-    return `Marine Stratus (${total}%)`;
+  if (total < 15) {
+    return "Clear (" + total + "%)";
+  }
 
-  if (mid >= low && mid >= high)
-    return `Altocumulus (${total}%)`;
+  if (low >= mid && low >= high) {
+    return "Marine Stratus (" + total + "%)";
+  }
 
-  return `High Cirrus (${total}%)`;
+  if (mid >= low && mid >= high) {
+    return "Altocumulus (" + total + "%)";
+  }
+
+  return "High Cirrus (" + total + "%)";
 }
 
 function sunText(uv, mj) {
+
   const u = uv || 0;
   const m = mj || 0;
 
-  const lvl =
+  const level =
     u >= 8 ? "Very High" :
     u >= 6 ? "High" :
-    u >= 3 ? "Moderate" : "Low";
+    u >= 3 ? "Moderate" :
+    "Low";
 
-  return `UV ${u.toFixed(1)} (${lvl}) - ${m.toFixed(1)} MJ/m²`;
+  return "UV " + u.toFixed(1) +
+    " (" + level + ") - " +
+    m.toFixed(1) + " MJ/m²";
 }
 
-// Convert Celsius to Fahrenheit
-function cToF(c) {
-  return c * 9 / 5 + 32;
+function safeNumber(value, decimals = 0) {
+  if (value == null || !Number.isFinite(Number(value))) {
+    return "N/A";
+  }
+
+  return Number(value).toFixed(decimals);
 }
 
-// National Weather Service data
-async function fetchNwsSafe(lat, lon) {
+// =====================================
+// FETCH WITH TIMEOUT
+// =====================================
+
+async function fetchWithTimeout(url, ms = 12000) {
+
+  const controller = new AbortController();
+
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, ms);
+
   try {
-    const pointUrl =
-      `https://api.weather.gov/points/${lat},${lon}`;
 
-    const r1 = await fetch(pointUrl, {
-      headers: { Accept: "application/geo+json" }
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store"
     });
 
-    if (!r1.ok) return null;
+    return response;
 
-    const j1 = await r1.json();
+  } finally {
 
-    const forecastUrl =
-      j1.properties?.forecast;
+    clearTimeout(timer);
 
-    if (!forecastUrl) return null;
-
-    const r2 = await fetch(forecastUrl, {
-      headers: { Accept: "application/geo+json" }
-    });
-
-    if (!r2.ok) return null;
-
-    const j2 = await r2.json();
-
-    const map = {};
-
-    j2.properties.periods.forEach(p => {
-      const key = p.startTime.slice(0, 10);
-
-      if (!map[key]) map[key] = {};
-
-      const pop =
-        p.probabilityOfPrecipitation?.value ?? 0;
-
-      const temp = p.temperatureUnit === "C"
-        ? cToF(p.temperature)
-        : p.temperature;
-
-      if (p.isDaytime) {
-        map[key].hi = temp;
-        map[key].dPop = pop;
-      } else {
-        map[key].lo = temp;
-        map[key].nPop = pop;
-      }
-    });
-
-    return map;
-
-  } catch (err) {
-    console.warn("NWS unavailable:", err);
-    return null;
   }
 }
 
-// Main weather loader
-async function loadWeather(loc) {
+// =====================================
+// BUILD WEATHER DATA
+// =====================================
+
+async function loadWeather(loc, force = false) {
+
   const listEl = document.getElementById("list");
 
-  document.getElementById("desc").textContent = loc.desc;
-  document.getElementById("time").textContent = "";
-  document.getElementById("badge").textContent = "Loading...";
+  document.getElementById("desc").textContent =
+    loc.desc;
 
-  if (cache[loc.id]) {
+  document.getElementById("time").textContent = "";
+
+  document.getElementById("badge").textContent =
+    "Loading...";
+
+  if (!force && cache[loc.id]) {
+
     render(cache[loc.id], loc);
     return;
+
   }
 
   listEl.innerHTML =
     '<div class="msg">Fetching weather forecast...</div>';
 
   const params = new URLSearchParams({
+
     latitude: loc.lat,
     longitude: loc.lon,
 
@@ -319,67 +373,51 @@ async function loadWeather(loc) {
     temperature_unit: "fahrenheit",
     wind_speed_unit: "mph",
     precipitation_unit: "inch",
+
     timezone: "America/Los_Angeles",
     forecast_days: "7"
+
   });
 
-  const omUrl =
-    `https://api.open-meteo.com/v1/forecast?${params}`;
+  const url =
+    "https://api.open-meteo.com/v1/forecast?" +
+    params.toString();
 
   try {
-    // Fetch Open-Meteo first, then attempt NWS
-    const res = await fetch(omUrl);
 
-    if (!res.ok) {
-      throw new Error(`Open-Meteo HTTP ${res.status}`);
+    // Open-Meteo is the ONLY required weather provider.
+    const response = await fetchWithTimeout(url);
+
+    if (!response.ok) {
+      throw new Error(
+        "Weather API returned HTTP " + response.status
+      );
     }
 
-    const om = await res.json();
+    const om = await response.json();
 
-    if (!om.daily || !om.hourly) {
-      throw new Error("Invalid weather response");
+    if (
+      !om.daily ||
+      !om.hourly ||
+      !Array.isArray(om.daily.time)
+    ) {
+      throw new Error("Invalid weather data received.");
     }
 
-    const nwsMap = await fetchNwsSafe(
-      loc.lat,
-      loc.lon
-    );
+    const days = om.daily.time.map((date, i) => {
 
-    const days = om.daily.time.map((dt, i) => {
-
+      // Daytime hours: 8 AM through 6 PM.
       const start = i * 24 + 8;
       const end = i * 24 + 19;
 
       const hi = om.daily.temperature_2m_max[i];
       const lo = om.daily.temperature_2m_min[i];
 
-      let finalHi = hi;
-      let finalLo = lo;
+      const rain =
+        om.daily.precipitation_sum[i];
 
-      let pop =
-        om.daily.precipitation_probability_max[i] ?? 0;
-
-      // Blend NWS and Open-Meteo where available
-      if (nwsMap?.[dt]) {
-        const nws = nwsMap[dt];
-
-        if (nws.hi !== undefined) {
-          finalHi = (hi + nws.hi) / 2;
-        }
-
-        if (nws.lo !== undefined) {
-          finalLo = (lo + nws.lo) / 2;
-        }
-
-        if (nws.dPop !== undefined || nws.nPop !== undefined) {
-          const nwsPop = Math.max(
-            nws.dPop ?? 0,
-            nws.nPop ?? 0
-          );
-
-          pop = Math.round((pop + nwsPop) / 2);
-        }
-      }
+      const pop =
+        om.daily.precipitation_probability_max[i];
 
       const lowCloud = average(
         om.hourly.cloud_cover_low, start, end
@@ -398,27 +436,43 @@ async function loadWeather(loc) {
       );
 
       const humidity = average(
-        om.hourly.relative_humidity_2m, start, end
+        om.hourly.relative_humidity_2m,
+        start,
+        end
       );
 
-      const date = new Date(dt + "T12:00:00");
+      const windSpeed =
+        om.daily.wind_speed_10m_max[i];
+
+      const windDirection =
+        om.daily.wind_direction_10m_dominant[i];
+
+      const uv =
+        om.daily.uv_index_max[i];
+
+      const radiation =
+        om.daily.shortwave_radiation_sum[i];
+
+      const dateObj =
+        new Date(date + "T12:00:00");
 
       const label = i === 0
         ? "Today"
-        : date.toLocaleDateString("en-US", {
+        : dateObj.toLocaleDateString("en-US", {
             weekday: "short",
             month: "short",
             day: "numeric"
           });
 
       return {
+
         lbl: label,
-        hi: Math.round(finalHi),
-        lo: Math.round(finalLo),
-        pop,
-        rainIn: (
-          om.daily.precipitation_sum[i] ?? 0
-        ).toFixed(2),
+
+        hi: safeNumber(hi),
+        lo: safeNumber(lo),
+
+        pop: safeNumber(pop),
+        rainIn: safeNumber(rain, 2),
 
         cld: cloudText(
           lowCloud,
@@ -427,82 +481,100 @@ async function loadWeather(loc) {
           totalCloud
         ),
 
-        hum: humidity,
+        hum: safeNumber(humidity),
 
         wnd:
-          compass(
-            om.daily.wind_direction_10m_dominant[i]
-          ) +
-          " " +
-          Math.round(
-            om.daily.wind_speed_10m_max[i] ?? 0
-          ) +
+          compass(windDirection) +
+          " " + safeNumber(windSpeed) +
           " mph",
 
         sun: sunText(
-          om.daily.uv_index_max[i],
-          om.daily.shortwave_radiation_sum[i]
+          Number(uv) || 0,
+          Number(radiation) || 0
         )
+
       };
+
     });
 
+    if (days.length === 0) {
+      throw new Error("No forecast days were returned.");
+    }
+
     const data = {
-      days,
-      blended: Boolean(nwsMap),
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      })
+
+      days: days,
+
+      time: new Date().toLocaleTimeString(
+        "en-US",
+        {
+          hour: "numeric",
+          minute: "2-digit"
+        }
+      )
+
     };
 
     cache[loc.id] = data;
 
-    // Prevent an old request from replacing a newer selection
+    // Only update the screen if this is still
+    // the currently selected location.
     if (active.id === loc.id) {
       render(data, loc);
     }
 
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
 
-    if (active.id === loc.id) {
-      document.getElementById("badge").textContent =
-        "Error";
+    console.error("Weather loading error:", error);
 
-      listEl.innerHTML = `
-        <div class="msg error">
-          <strong>Unable to load weather.</strong>
-          <br><br>
-          ${escapeHtml(err.message)}
-          <br><br>
-          Check your internet connection and try again.
-          <br><br>
-          <button onclick="loadWeather(active)"
-            style="padding:10px 16px;border-radius:8px;
-            border:0;background:#38bdf8;color:#0f172a;
-            font-weight:bold;cursor:pointer">
-            Retry
-          </button>
-        </div>
-      `;
-    }
+    if (active.id !== loc.id) return;
+
+    document.getElementById("badge").textContent =
+      "Unavailable";
+
+    const message =
+      error.name === "AbortError"
+        ? "The weather server took too long to respond."
+        : error.message;
+
+    listEl.innerHTML = "";
+
+    const errorBox = document.createElement("div");
+    errorBox.className = "msg error";
+
+    const title = document.createElement("strong");
+    title.textContent = "Unable to load weather.";
+
+    const detail = document.createElement("p");
+    detail.style.marginTop = "10px";
+    detail.textContent = message;
+
+    const retry = document.createElement("button");
+    retry.className = "retry";
+    retry.textContent = "Try Again";
+
+    retry.onclick = () => {
+      loadWeather(loc, true);
+    };
+
+    errorBox.appendChild(title);
+    errorBox.appendChild(detail);
+    errorBox.appendChild(retry);
+
+    listEl.appendChild(errorBox);
+
   }
+
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[c]);
-}
+// =====================================
+// DISPLAY FORECAST
+// =====================================
 
-// Render forecast
 function render(data, loc) {
+
   document.getElementById("badge").textContent =
-    data.blended ? "NWS + Open-Meteo" : "Open-Meteo";
+    "Open-Meteo";
 
   document.getElementById("desc").textContent =
     loc.desc;
@@ -510,86 +582,112 @@ function render(data, loc) {
   document.getElementById("time").textContent =
     "Updated " + data.time;
 
-  document.getElementById("list").innerHTML =
-    data.days.map(x => `
-      <div class="card">
+  const list = document.getElementById("list");
 
-        <div class="top">
-          <div>${x.lbl}</div>
-          <div>
-            ${x.hi}&deg;
-            <span>/ ${x.lo}&deg;</span>
-          </div>
+  list.innerHTML = data.days.map(x => `
+
+    <div class="card">
+
+      <div class="top">
+
+        <div>${x.lbl}</div>
+
+        <div>
+          ${x.hi}&deg;
+          <span>/ ${x.lo}&deg;</span>
         </div>
 
-        <div class="grid">
-
-          <div>
-            <span class="lbl">Precipitation</span>
-            <span class="val" style="color:#60a5fa">
-              ${x.pop}% · ${x.rainIn}"
-            </span>
-          </div>
-
-          <div>
-            <span class="lbl">Clouds</span>
-            <span class="val">${x.cld}</span>
-          </div>
-
-          <div>
-            <span class="lbl">Wind (Peak)</span>
-            <span class="val">${x.wnd}</span>
-          </div>
-
-          <div>
-            <span class="lbl">Humidity (Day)</span>
-            <span class="val">${x.hum}%</span>
-          </div>
-
-          <div style="grid-column:span 2">
-            <span class="lbl">Sun Intensity</span>
-            <span class="val" style="color:#fbbf24">
-              ${x.sun}
-            </span>
-          </div>
-
-        </div>
       </div>
-    `).join("");
+
+      <div class="grid">
+
+        <div>
+          <span class="lbl">Precipitation</span>
+          <span class="val" style="color:#60a5fa">
+            ${x.pop}% · ${x.rainIn}"
+          </span>
+        </div>
+
+        <div>
+          <span class="lbl">Clouds</span>
+          <span class="val">${x.cld}</span>
+        </div>
+
+        <div>
+          <span class="lbl">Wind (Peak)</span>
+          <span class="val">${x.wnd}</span>
+        </div>
+
+        <div>
+          <span class="lbl">Humidity (Day)</span>
+          <span class="val">${x.hum}%</span>
+        </div>
+
+        <div style="grid-column:span 2">
+
+          <span class="lbl">Sun Intensity</span>
+
+          <span class="val" style="color:#fbbf24">
+            ${x.sun}
+          </span>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  `).join("");
+
 }
 
-// Create location tabs
+// =====================================
+// LOCATION TABS
+// =====================================
+
 function createTabs() {
+
   const tabs = document.getElementById("tabs");
 
   LOCS.forEach(loc => {
-    const btn = document.createElement("button");
 
-    btn.className =
-      "tab" + (loc.id === active.id ? " active" : "");
+    const button = document.createElement("button");
 
-    btn.textContent = loc.name;
+    button.className =
+      "tab" +
+      (loc.id === active.id ? " active" : "");
 
-    btn.onclick = () => {
+    button.textContent = loc.name;
+
+    button.onclick = () => {
+
       active = loc;
 
-      document.querySelectorAll(".tab").forEach(t => {
-        t.classList.remove("active");
+      document.querySelectorAll(".tab").forEach(tab => {
+        tab.classList.remove("active");
       });
 
-      btn.classList.add("active");
+      button.classList.add("active");
 
       loadWeather(loc);
+
     };
 
-    tabs.appendChild(btn);
+    tabs.appendChild(button);
+
   });
+
 }
 
-// Start
+// =====================================
+// START APPLICATION
+// =====================================
+
 createTabs();
+
 loadWeather(active);
 
 </script>
+
 </body>
 </html>
