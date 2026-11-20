@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -121,7 +121,6 @@
 
     async function loadForecast(loc) {
       const listEl = document.getElementById('forecast-list');
-      const badgeEl = document.getElementById('source-badge');
       document.getElementById('loc-desc').textContent = loc.desc;
 
       if (cache[loc.id]) {
@@ -139,7 +138,6 @@
       ]);
 
       const days = omRes.daily.time.map((dateStr, i) => {
-        // Slice daytime hours (08:00 to 18:00) for accurate cloud type & humidity
         const startIdx = i * 24 + 8;
         const endIdx = i * 24 + 19;
         const avg = arr => Math.round(arr.slice(startIdx, endIdx).reduce((a, b) => a + b, 0) / 11);
@@ -154,7 +152,6 @@
         let low = omRes.daily.temperature_2m_min[i];
         let pop = omRes.daily.precipitation_probability_max[i];
 
-        // Blend with NWS if available
         const nwsDay = nwsData?.[dateStr];
         if (nwsDay) {
           if (nwsDay.high != null) high = (high + nwsDay.high) / 2;
@@ -219,3 +216,8 @@
         </div>
       `).join('');
     }
+
+    function initTabs() {
+      const tabsEl = document.getElementById('tabs');
+      LOCATIONS.forEach(loc => {
+        const btn = document.createElement('button');
