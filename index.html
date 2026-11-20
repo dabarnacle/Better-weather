@@ -70,7 +70,17 @@
       if (cache[loc.id]) return render(cache[loc.id]);
       document.getElementById('list').innerHTML = '<div class="loading">Averaging NWS & Open-Meteo...</div>';
       try {
-        const url = `https://open-meteo.com{loc.lat}&longitude=${loc.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles`;
+        const params = new URLSearchParams({
+          latitude: loc.lat,
+          longitude: loc.lon,
+          daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum',
+          hourly: 'cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m',
+          temperature_unit: 'fahrenheit',
+          wind_speed_unit: 'mph',
+          precipitation_unit: 'inch',
+          timezone: 'America/Los_Angeles'
+        });
+        const url = 'https://open-meteo.com?' + params.toString();
         const [omRes, nws] = await Promise.all([fetch(url), getNWS(loc.lat, loc.lon)]);
         if (!omRes.ok) throw new Error('Open-Meteo HTTP ' + omRes.status);
         const om = await omRes.json();
