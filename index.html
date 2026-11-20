@@ -24,14 +24,14 @@
     .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px 12px; font-size:.82rem; }
     .lbl { color:var(--mut); font-size:.68rem; text-transform:uppercase; display:block; }
     .val { font-weight:600; }
-    .loading { text-align:center; padding:40px 0; color:var(--mut); }
+    .loading { text-align:center; padding:40px 10px; color:var(--mut); line-height:1.5; }
   </style>
 </head>
 <body>
   <header><h1>LA 7-Day Forecast</h1><span class="badge" id="badge">Loading...</span></header>
   <div class="tabs" id="tabs"></div>
   <div class="sub"><span id="desc"></span><span id="time"></span></div>
-  <div id="list"><div class="loading">Fetching NWS & Open-Meteo data...</div></div>
+  <div id="list"><div class="loading">Fetching forecast...</div></div>
   <script>
     const LOCS = [
       { id:'coast', name:'Coast', desc:'Santa Monica / Venice / South Bay', lat:34.0195, lon:-118.4912 },
@@ -40,14 +40,19 @@
     ];
     let active = LOCS.at(0), cache = {};
     const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-    const compass = d => dirs.at(Math.round(d / 22.5) % 16);
+    const compass = d => dirs.at(Math.round((d ?? 0) / 22.5) % 16);
     const cloudTxt = (l,m,h,t) => t < 15 ? `Clear (${t}%)` : (l>=m && l>=h) ? `${t>75?'Overcast':'Marine'} Stratus (${t}%)` : (m>=l && m>=h) ? `Altocumulus (${t}%)` : `High Cirrus (${t}%)`;
-    const sunTxt = (uv,mj) => `UV ${uv.toFixed(1)} (${uv>=8?'Very High':uv>=6?'High':uv>=3?'Moderate':'Low'}) · ${mj.toFixed(1)} MJ/m²`;
+    const sunTxt = (uv,mj) => { const u=uv??0, m=mj??0; return `UV ${u.toFixed(1)} (${u>=8?'Very High':u>=6?'High':u>=3?'Moderate':'Low'}) · ${m.toFixed(1)} MJ/m²`; };
 
     async function getNWS(lat, lon) {
       try {
-        const pt = await (await fetch(`https://weather.gov{lat},${lon}`)).json();
-        const fc = await (await fetch(pt.properties.forecast)).json();
+        const opts = { headers: { 'Accept': 'application/geo+json' } };
+        const ptRes = await fetch(`https://weather.gov{lat},${lon}`, opts);
+        if (!ptRes.ok) return null;
+        const pt = await ptRes.json();
+        const fcRes = await fetch(pt.properties.forecast, opts);
+        if (!fcRes.ok) return null;
+        const fc = await fcRes.json();
         const map = {};
         fc.properties.periods.forEach(p => {
           const k = p.startTime.slice(0,10);
@@ -64,30 +69,38 @@
       document.getElementById('desc').textContent = loc.desc;
       if (cache[loc.id]) return render(cache[loc.id]);
       document.getElementById('list').innerHTML = '<div class="loading">Averaging NWS & Open-Meteo...</div>';
-      const url = `https://open-meteo.com{loc.lat}&longitude=${loc.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles`;
-      const [om, nws] = await Promise.all([fetch(url).then(r=>r.json()), getNWS(loc.lat, loc.lon)]);
-      const days = om.daily.time.map((dt, i) => {
-        const s = i*24+8, e = i*24+19;
-        const avg = a => Math.round(a.slice(s,e).reduce((x,y)=>x+y,0)/11);
-        let hi = om.daily.temperature_2m_max.at(i), lo = om.daily.temperature_2m_min.at(i), pop = om.daily.precipitation_probability_max.at(i);
-        const nd = nws?.[dt];
-        if (nd) {
-          if (nd.hi != null) hi = (hi + nd.hi)/2;
-          if (nd.lo != null) lo = (lo + nd.lo)/2;
-          pop = Math.round((pop + Math.max(nd.dPop??0, nd.nPop??0))/2);
-        }
-        const lbl = i===0 ? 'Today' : new Date(dt+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-        return {
-          lbl, hi:Math.round(hi), lo:Math.round(lo), pop,
-          in: om.daily.precipitation_sum.at(i).toFixed(2),
-          cld: cloudTxt(avg(om.hourly.cloud_cover_low), avg(om.hourly.cloud_cover_mid), avg(om.hourly.cloud_cover_high), avg(om.hourly.cloud_cover)),
-          hum: avg(om.hourly.relative_humidity_2m),
-          wnd: `${compass(om.daily.wind_direction_10m_dominant.at(i))} ${Math.round(om.daily.wind_speed_10m_max.at(i))} mph`,
-          sun: sunTxt(om.daily.uv_index_max.at(i), om.daily.shortwave_radiation_sum.at(i))
-        };
-      });
-      cache[loc.id] = { days, blended:!!nws, time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) };
-      render(cache[loc.id]);
+      try {
+        const url = `https://open-meteo.com{loc.lat}&longitude=${loc.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles`;
+        const [omRes, nws] = await Promise.all([fetch(url), getNWS(loc.lat, loc.lon)]);
+        if (!omRes.ok) throw new Error('Open-Meteo HTTP ' + omRes.status);
+        const om = await omRes.json();
+        const days = om.daily.time.map((dt, i) => {
+          const s = i*24+8, e = i*24+19;
+          const avg = a => Math.round(a.slice(s,e).reduce((x,y)=>x+(y??0),0)/11);
+          let hi = om.daily.temperature_2m_max.at(i) ?? 0;
+          let lo = om.daily.temperature_2m_min.at(i) ?? 0;
+          let pop = om.daily.precipitation_probability_max.at(i) ?? 0;
+          const nd = nws?.[dt];
+          if (nd) {
+            if (nd.hi != null) hi = (hi + nd.hi)/2;
+            if (nd.lo != null) lo = (lo + nd.lo)/2;
+            pop = Math.round((pop + Math.max(nd.dPop??0, nd.nPop??0))/2);
+          }
+          const lbl = i===0 ? 'Today' : new Date(dt+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          return {
+            lbl, hi:Math.round(hi), lo:Math.round(lo), pop,
+            in: (om.daily.precipitation_sum.at(i) ?? 0).toFixed(2),
+            cld: cloudTxt(avg(om.hourly.cloud_cover_low), avg(om.hourly.cloud_cover_mid), avg(om.hourly.cloud_cover_high), avg(om.hourly.cloud_cover)),
+            hum: avg(om.hourly.relative_humidity_2m),
+            wnd: `${compass(om.daily.wind_direction_10m_dominant.at(i))} ${Math.round(om.daily.wind_speed_10m_max.at(i) ?? 0)} mph`,
+            sun: sunTxt(om.daily.uv_index_max.at(i), om.daily.shortwave_radiation_sum.at(i))
+          };
+        });
+        cache[loc.id] = { days, blended:!!nws, time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) };
+        render(cache[loc.id]);
+      } catch (err) {
+        document.getElementById('list').innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+      }
     }
 
     function render(d) {
