@@ -1,175 +1,595 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LA Weather</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
-    body { background: #0f172a; color: #f8fafc; padding: 20px 14px 40px; max-width: 600px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    h1 { font-size: 1.2rem; }
-    .badge { font-size: 0.72rem; background: #0284c733; color: #38bdf8; border: 1px solid #0284c766; padding: 3px 8px; border-radius: 99px; }
-    .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
-    .tab { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 0.85rem; }
-    .tab.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
-    .sub { font-size: 0.75rem; color: #94a3b8; margin-bottom: 12px; display: flex; justify-content: space-between; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 14px; margin-bottom: 10px; }
-    .top { display: flex; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px; font-weight: 700; }
-    .top span { color: #94a3b8; font-weight: 500; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 0.82rem; }
-    .lbl { color: #94a3b8; font-size: 0.68rem; text-transform: uppercase; display: block; }
-    .val { font-weight: 600; }
-    .msg { padding: 20px 10px; color: #94a3b8; line-height: 1.5; word-break: break-all; font-size: 0.8rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA Weather</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 20px 14px 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+h1 { font-size: 1.2rem; }
+
+.badge {
+  font-size: 0.72rem;
+  background: #0284c733;
+  color: #38bdf8;
+  border: 1px solid #0284c766;
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  padding: 10px 4px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #38bdf8;
+  color: #0f172a;
+  border-color: #38bdf8;
+}
+
+.sub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.top span { color: #94a3b8; font-weight: 500; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  font-size: 0.82rem;
+}
+
+.lbl {
+  color: #94a3b8;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.val { font-weight: 600; }
+
+.msg {
+  padding: 20px 10px;
+  color: #94a3b8;
+  line-height: 1.5;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.error { color: #fca5a5; }
+
+</style>
 </head>
+
 <body>
-  <header>
-    <h1>LA 7-Day Forecast</h1>
-    <span class="badge" id="badge">v6</span>
-  </header>
-  <div class="tabs" id="tabs"></div>
-  <div class="sub"><span id="desc"></span><span id="time"></span></div>
-  <div id="list"><div class="msg">Loading v6...</div></div>
 
-  <script>
-    var LOCS = [
-      { id: "coast", name: "Coast", desc: "Santa Monica / Venice / South Bay", lat: "34.0195", lon: "-118.4912" },
-      { id: "basin", name: "LA Basin", desc: "DTLA / Culver City / Mid-City", lat: "34.0259", lon: "-118.3965" },
-      { id: "valley", name: "Valleys", desc: "Pasadena / SGV / SFV", lat: "34.1478", lon: "-118.1445" }
-    ];
+<header>
+  <h1>LA 7-Day Forecast</h1>
+  <span class="badge" id="badge">Loading...</span>
+</header>
 
-    var active = LOCS.at(0);
-    var cache = {};
-    var dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+<div class="tabs" id="tabs"></div>
 
-    function compass(deg) {
-      return dirs.at(Math.round((deg || 0) / 22.5) % 16);
-    }
+<div class="sub">
+  <span id="desc"></span>
+  <span id="time"></span>
+</div>
 
-    function cloudText(l, m, h, t) {
-      if (t < 15) return "Clear (" + t + "%)";
-      if (l >= m && l >= h) return (t > 75 ? "Overcast Stratus (" : "Marine Stratus (") + t + "%)";
-      if (m >= l && m >= h) return "Altocumulus (" + t + "%)";
-      return "High Cirrus (" + t + "%)";
-    }
+<div id="list">
+  <div class="msg">Loading weather...</div>
+</div>
 
-    function sunText(uv, mj) {
-      var u = uv || 0, m = mj || 0;
-      var lvl = u >= 8 ? "Very High" : u >= 6 ? "High" : u >= 3 ? "Moderate" : "Low";
-      return "UV " + u.toFixed(1) + " (" + lvl + ") - " + m.toFixed(1) + " MJ/m2";
-    }
+<script>
 
-    async function loadWeather(loc) {
-      var listEl = document.getElementById("list");
-      document.getElementById("desc").textContent = loc.desc;
-      if (cache[loc.id]) { render(cache[loc.id]); return; }
+const LOCS = [
+  {
+    id: "coast",
+    name: "Coast",
+    desc: "Santa Monica / Venice / South Bay",
+    lat: 34.0195,
+    lon: -118.4912
+  },
+  {
+    id: "basin",
+    name: "LA Basin",
+    desc: "DTLA / Culver City / Mid-City",
+    lat: 34.0259,
+    lon: -118.3965
+  },
+  {
+    id: "valley",
+    name: "Valleys",
+    desc: "Pasadena / SGV / SFV",
+    lat: 34.1478,
+    lon: -118.1445
+  }
+];
 
-      var query = [
-        "latitude=" + loc.lat,
-        "longitude=" + loc.lon,
-        "daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum",
-        "hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m",
-        "temperature_unit=fahrenheit",
-        "wind_speed_unit=mph",
-        "precipitation_unit=inch",
-        "timezone=America%2FLos_Angeles"
-      ].join("&");
+let active = LOCS[0];
+const cache = {};
 
-      var omUrl = "https://open-meteo.com?" + query;
+const dirs = [
+  "N","NNE","NE","ENE","E","ESE","SE","SSE",
+  "S","SSW","SW","WSW","W","WNW","NW","NNW"
+];
 
-      try {
-        var res = await fetch(omUrl);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        var om = await res.json();
-        var nwsMap = await fetchNwsSafe(loc.lat, loc.lon);
+function compass(deg) {
+  return dirs[Math.round((deg || 0) / 22.5) % 16];
+}
 
-        var days = om.daily.time.map(function(dt, i) {
-          var s = i * 24 + 8, e = i * 24 + 19;
-          function avg(arr) {
-            var sum = 0;
-            for (var k = s; k < e; k++) sum += (arr.at(k) || 0);
-            return Math.round(sum / 11);
-          }
-          var hi = om.daily.temperature_2m_max.at(i) || 0;
-          var lo = om.daily.temperature_2m_min.at(i) || 0;
-          var pop = om.daily.precipitation_probability_max.at(i) || 0;
-          if (nwsMap && nwsMap[dt]) {
-            if (nwsMap[dt].hi !== undefined) hi = (hi + nwsMap[dt].hi) / 2;
-            if (nwsMap[dt].lo !== undefined) lo = (lo + nwsMap[dt].lo) / 2;
-            pop = Math.round((pop + Math.max(nwsMap[dt].dPop || 0, nwsMap[dt].nPop || 0)) / 2);
-          }
-          var dObj = new Date(dt + "T12:00:00");
-          var lbl = i === 0 ? "Today" : dObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-          return {
-            lbl: lbl, hi: Math.round(hi), lo: Math.round(lo), pop: pop,
-            rainIn: (om.daily.precipitation_sum.at(i) || 0).toFixed(2),
-            cld: cloudText(avg(om.hourly.cloud_cover_low), avg(om.hourly.cloud_cover_mid), avg(om.hourly.cloud_cover_high), avg(om.hourly.cloud_cover)),
-            hum: avg(om.hourly.relative_humidity_2m),
-            wnd: compass(om.daily.wind_direction_10m_dominant.at(i)) + " " + Math.round(om.daily.wind_speed_10m_max.at(i) || 0) + " mph",
-            sun: sunText(om.daily.uv_index_max.at(i), om.daily.shortwave_radiation_sum.at(i))
-          };
-        });
+function average(arr, start, end) {
+  const values = arr.slice(start, end).filter(
+    v => v !== null && v !== undefined
+  );
 
-        cache[loc.id] = { days: days, blended: Boolean(nwsMap), time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
-        render(cache[loc.id]);
-      } catch (err) {
-        listEl.innerHTML = "<div class='msg'><strong>Error:</strong> " + err.message + "<br><br><strong>URL attempted:</strong><br>" + omUrl + "</div>";
-      }
-    }
+  if (!values.length) return 0;
 
-    async function fetchNwsSafe(lat, lon) {
-      try {
-        var r1 = await fetch("https://weather.gov" + lat + "," + lon);
-        if (!r1.ok) return null;
-        var j1 = await r1.json();
-        var fcUrl = j1 && j1.properties && j1.properties.forecast;
-        if (!fcUrl || typeof fcUrl !== "string") return null;
-        var r2 = await fetch(fcUrl.trim());
-        if (!r2.ok) return null;
-        var j2 = await r2.json();
-        var map = {};
-        j2.properties.periods.forEach(function(p) {
-          var k = p.startTime.slice(0, 10);
-          if (!map[k]) map[k] = {};
-          var pop = (p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value) || 0;
-          if (p.isDaytime) { map[k].hi = p.temperature; map[k].dPop = pop; }
-          else { map[k].lo = p.temperature; map[k].nPop = pop; }
-        });
-        return map;
-      } catch (e) { return null; }
-    }
+  return Math.round(
+    values.reduce((a, b) => a + b, 0) / values.length
+  );
+}
 
-    function render(data) {
-      document.getElementById("badge").textContent = data.blended ? "NWS + Open-Meteo" : "Open-Meteo";
-      document.getElementById("time").textContent = "Updated " + data.time;
-      document.getElementById("list").innerHTML = data.days.map(function(x) {
-        return "<div class='card'>" +
-          "<div class='top'><div>" + x.lbl + "</div><div>" + x.hi + "&deg; <span>/ " + x.lo + "&deg;</span></div></div>" +
-          "<div class='grid'>" +
-            "<div><span class='lbl'>Precipitation</span><span class='val' style='color:#60a5fa'>" + x.pop + "% &middot; " + x.rainIn + "\"</span></div>" +
-            "<div><span class='lbl'>Clouds</span><span class='val'>" + x.cld + "</span></div>" +
-            "<div><span class='lbl'>Wind (Peak)</span><span class='val'>" + x.wnd + "</span></div>" +
-            "<div><span class='lbl'>Humidity (Day)</span><span class='val'>" + x.hum + "%</span></div>" +
-            "<div style='grid-column:span 2'><span class='lbl'>Sun Intensity</span><span class='val' style='color:#fbbf24'>" + x.sun + "</span></div>" +
-          "</div></div>";
-      }).join("");
-    }
+function cloudText(low, mid, high, total) {
+  if (total < 15) return `Clear (${total}%)`;
 
-    LOCS.forEach(function(loc) {
-      var btn = document.createElement("button");
-      btn.className = "tab" + (loc.id === active.id ? " active" : "");
-      btn.textContent = loc.name;
-      btn.onclick = function() {
-        active = loc;
-        document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
-        btn.classList.add("active");
-        loadWeather(loc);
-      };
-      document.getElementById("tabs").appendChild(btn);
+  if (low >= mid && low >= high)
+    return `Marine Stratus (${total}%)`;
+
+  if (mid >= low && mid >= high)
+    return `Altocumulus (${total}%)`;
+
+  return `High Cirrus (${total}%)`;
+}
+
+function sunText(uv, mj) {
+  const u = uv || 0;
+  const m = mj || 0;
+
+  const lvl =
+    u >= 8 ? "Very High" :
+    u >= 6 ? "High" :
+    u >= 3 ? "Moderate" : "Low";
+
+  return `UV ${u.toFixed(1)} (${lvl}) - ${m.toFixed(1)} MJ/m²`;
+}
+
+// Convert Celsius to Fahrenheit
+function cToF(c) {
+  return c * 9 / 5 + 32;
+}
+
+// National Weather Service data
+async function fetchNwsSafe(lat, lon) {
+  try {
+    const pointUrl =
+      `https://api.weather.gov/points/${lat},${lon}`;
+
+    const r1 = await fetch(pointUrl, {
+      headers: { Accept: "application/geo+json" }
     });
 
-    loadWeather(active);
-  </script>
+    if (!r1.ok) return null;
+
+    const j1 = await r1.json();
+
+    const forecastUrl =
+      j1.properties?.forecast;
+
+    if (!forecastUrl) return null;
+
+    const r2 = await fetch(forecastUrl, {
+      headers: { Accept: "application/geo+json" }
+    });
+
+    if (!r2.ok) return null;
+
+    const j2 = await r2.json();
+
+    const map = {};
+
+    j2.properties.periods.forEach(p => {
+      const key = p.startTime.slice(0, 10);
+
+      if (!map[key]) map[key] = {};
+
+      const pop =
+        p.probabilityOfPrecipitation?.value ?? 0;
+
+      const temp = p.temperatureUnit === "C"
+        ? cToF(p.temperature)
+        : p.temperature;
+
+      if (p.isDaytime) {
+        map[key].hi = temp;
+        map[key].dPop = pop;
+      } else {
+        map[key].lo = temp;
+        map[key].nPop = pop;
+      }
+    });
+
+    return map;
+
+  } catch (err) {
+    console.warn("NWS unavailable:", err);
+    return null;
+  }
+}
+
+// Main weather loader
+async function loadWeather(loc) {
+  const listEl = document.getElementById("list");
+
+  document.getElementById("desc").textContent = loc.desc;
+  document.getElementById("time").textContent = "";
+  document.getElementById("badge").textContent = "Loading...";
+
+  if (cache[loc.id]) {
+    render(cache[loc.id], loc);
+    return;
+  }
+
+  listEl.innerHTML =
+    '<div class="msg">Fetching weather forecast...</div>';
+
+  const params = new URLSearchParams({
+    latitude: loc.lat,
+    longitude: loc.lon,
+
+    daily: [
+      "temperature_2m_max",
+      "temperature_2m_min",
+      "precipitation_sum",
+      "precipitation_probability_max",
+      "wind_speed_10m_max",
+      "wind_direction_10m_dominant",
+      "uv_index_max",
+      "shortwave_radiation_sum"
+    ].join(","),
+
+    hourly: [
+      "cloud_cover",
+      "cloud_cover_low",
+      "cloud_cover_mid",
+      "cloud_cover_high",
+      "relative_humidity_2m"
+    ].join(","),
+
+    temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
+    precipitation_unit: "inch",
+    timezone: "America/Los_Angeles",
+    forecast_days: "7"
+  });
+
+  const omUrl =
+    `https://api.open-meteo.com/v1/forecast?${params}`;
+
+  try {
+    // Fetch Open-Meteo first, then attempt NWS
+    const res = await fetch(omUrl);
+
+    if (!res.ok) {
+      throw new Error(`Open-Meteo HTTP ${res.status}`);
+    }
+
+    const om = await res.json();
+
+    if (!om.daily || !om.hourly) {
+      throw new Error("Invalid weather response");
+    }
+
+    const nwsMap = await fetchNwsSafe(
+      loc.lat,
+      loc.lon
+    );
+
+    const days = om.daily.time.map((dt, i) => {
+
+      const start = i * 24 + 8;
+      const end = i * 24 + 19;
+
+      const hi = om.daily.temperature_2m_max[i];
+      const lo = om.daily.temperature_2m_min[i];
+
+      let finalHi = hi;
+      let finalLo = lo;
+
+      let pop =
+        om.daily.precipitation_probability_max[i] ?? 0;
+
+      // Blend NWS and Open-Meteo where available
+      if (nwsMap?.[dt]) {
+        const nws = nwsMap[dt];
+
+        if (nws.hi !== undefined) {
+          finalHi = (hi + nws.hi) / 2;
+        }
+
+        if (nws.lo !== undefined) {
+          finalLo = (lo + nws.lo) / 2;
+        }
+
+        if (nws.dPop !== undefined || nws.nPop !== undefined) {
+          const nwsPop = Math.max(
+            nws.dPop ?? 0,
+            nws.nPop ?? 0
+          );
+
+          pop = Math.round((pop + nwsPop) / 2);
+        }
+      }
+
+      const lowCloud = average(
+        om.hourly.cloud_cover_low, start, end
+      );
+
+      const midCloud = average(
+        om.hourly.cloud_cover_mid, start, end
+      );
+
+      const highCloud = average(
+        om.hourly.cloud_cover_high, start, end
+      );
+
+      const totalCloud = average(
+        om.hourly.cloud_cover, start, end
+      );
+
+      const humidity = average(
+        om.hourly.relative_humidity_2m, start, end
+      );
+
+      const date = new Date(dt + "T12:00:00");
+
+      const label = i === 0
+        ? "Today"
+        : date.toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric"
+          });
+
+      return {
+        lbl: label,
+        hi: Math.round(finalHi),
+        lo: Math.round(finalLo),
+        pop,
+        rainIn: (
+          om.daily.precipitation_sum[i] ?? 0
+        ).toFixed(2),
+
+        cld: cloudText(
+          lowCloud,
+          midCloud,
+          highCloud,
+          totalCloud
+        ),
+
+        hum: humidity,
+
+        wnd:
+          compass(
+            om.daily.wind_direction_10m_dominant[i]
+          ) +
+          " " +
+          Math.round(
+            om.daily.wind_speed_10m_max[i] ?? 0
+          ) +
+          " mph",
+
+        sun: sunText(
+          om.daily.uv_index_max[i],
+          om.daily.shortwave_radiation_sum[i]
+        )
+      };
+    });
+
+    const data = {
+      days,
+      blended: Boolean(nwsMap),
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    };
+
+    cache[loc.id] = data;
+
+    // Prevent an old request from replacing a newer selection
+    if (active.id === loc.id) {
+      render(data, loc);
+    }
+
+  } catch (err) {
+    console.error(err);
+
+    if (active.id === loc.id) {
+      document.getElementById("badge").textContent =
+        "Error";
+
+      listEl.innerHTML = `
+        <div class="msg error">
+          <strong>Unable to load weather.</strong>
+          <br><br>
+          ${escapeHtml(err.message)}
+          <br><br>
+          Check your internet connection and try again.
+          <br><br>
+          <button onclick="loadWeather(active)"
+            style="padding:10px 16px;border-radius:8px;
+            border:0;background:#38bdf8;color:#0f172a;
+            font-weight:bold;cursor:pointer">
+            Retry
+          </button>
+        </div>
+      `;
+    }
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[c]);
+}
+
+// Render forecast
+function render(data, loc) {
+  document.getElementById("badge").textContent =
+    data.blended ? "NWS + Open-Meteo" : "Open-Meteo";
+
+  document.getElementById("desc").textContent =
+    loc.desc;
+
+  document.getElementById("time").textContent =
+    "Updated " + data.time;
+
+  document.getElementById("list").innerHTML =
+    data.days.map(x => `
+      <div class="card">
+
+        <div class="top">
+          <div>${x.lbl}</div>
+          <div>
+            ${x.hi}&deg;
+            <span>/ ${x.lo}&deg;</span>
+          </div>
+        </div>
+
+        <div class="grid">
+
+          <div>
+            <span class="lbl">Precipitation</span>
+            <span class="val" style="color:#60a5fa">
+              ${x.pop}% · ${x.rainIn}"
+            </span>
+          </div>
+
+          <div>
+            <span class="lbl">Clouds</span>
+            <span class="val">${x.cld}</span>
+          </div>
+
+          <div>
+            <span class="lbl">Wind (Peak)</span>
+            <span class="val">${x.wnd}</span>
+          </div>
+
+          <div>
+            <span class="lbl">Humidity (Day)</span>
+            <span class="val">${x.hum}%</span>
+          </div>
+
+          <div style="grid-column:span 2">
+            <span class="lbl">Sun Intensity</span>
+            <span class="val" style="color:#fbbf24">
+              ${x.sun}
+            </span>
+          </div>
+
+        </div>
+      </div>
+    `).join("");
+}
+
+// Create location tabs
+function createTabs() {
+  const tabs = document.getElementById("tabs");
+
+  LOCS.forEach(loc => {
+    const btn = document.createElement("button");
+
+    btn.className =
+      "tab" + (loc.id === active.id ? " active" : "");
+
+    btn.textContent = loc.name;
+
+    btn.onclick = () => {
+      active = loc;
+
+      document.querySelectorAll(".tab").forEach(t => {
+        t.classList.remove("active");
+      });
+
+      btn.classList.add("active");
+
+      loadWeather(loc);
+    };
+
+    tabs.appendChild(btn);
+  });
+}
+
+// Start
+createTabs();
+loadWeather(active);
+
+</script>
 </body>
 </html>
