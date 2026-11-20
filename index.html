@@ -47,7 +47,8 @@
     async function getNWS(lat, lon) {
       try {
         const opts = { headers: { 'Accept': 'application/geo+json' } };
-        const ptRes = await fetch(`https://weather.gov{lat},${lon}`, opts);
+        const ptUrl = new URL(`https://weather.gov{lat},${lon}`);
+        const ptRes = await fetch(ptUrl.href, opts);
         if (!ptRes.ok) return null;
         const pt = await ptRes.json();
         const fcRes = await fetch(pt.properties.forecast, opts);
@@ -70,18 +71,32 @@
       if (cache[loc.id]) return render(cache[loc.id]);
       document.getElementById('list').innerHTML = '<div class="loading">Averaging NWS & Open-Meteo...</div>';
       try {
-        const params = new URLSearchParams({
-          latitude: loc.lat,
-          longitude: loc.lon,
-          daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,shortwave_radiation_sum',
-          hourly: 'cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m',
-          temperature_unit: 'fahrenheit',
-          wind_speed_unit: 'mph',
-          precipitation_unit: 'inch',
-          timezone: 'America/Los_Angeles'
-        });
-        const url = 'https://open-meteo.com?' + params.toString();
-        const [omRes, nws] = await Promise.all([fetch(url), getNWS(loc.lat, loc.lon)]);
+        const u = new URL('https://open-meteo.com');
+        u.searchParams.set('latitude', String(loc.lat));
+        u.searchParams.set('longitude', String(loc.lon));
+        u.searchParams.set('daily', [
+          'temperature_2m_max',
+          'temperature_2m_min',
+          'precipitation_sum',
+          'precipitation_probability_max',
+          'wind_speed_10m_max',
+          'wind_direction_10m_dominant',
+          'uv_index_max',
+          'shortwave_radiation_sum'
+        ].join(','));
+        u.searchParams.set('hourly', [
+          'cloud_cover',
+          'cloud_cover_low',
+          'cloud_cover_mid',
+          'cloud_cover_high',
+          'relative_humidity_2m'
+        ].join(','));
+        u.searchParams.set('temperature_unit', 'fahrenheit');
+        u.searchParams.set('wind_speed_unit', 'mph');
+        u.searchParams.set('precipitation_unit', 'inch');
+        u.searchParams.set('timezone', 'America/Los_Angeles');
+
+        const [omRes, nws] = await Promise.all([fetch(u.href), getNWS(loc.lat, loc.lon)]);
         if (!omRes.ok) throw new Error('Open-Meteo HTTP ' + omRes.status);
         const om = await omRes.json();
         const days = om.daily.time.map((dt, i) => {
